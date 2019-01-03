@@ -1,0 +1,378 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Windows.Forms;
+using System.IO;
+//引用创建Access数据库的库
+using System.Data.OleDb;
+using System.Collections;
+
+namespace SunManage.communication
+{
+    public partial class Import : Form
+    {
+       
+        private static int mflag = 0;//标志位查看数据库是否存在这条记录
+        private static int flag = 0;
+        string firstLine = "";//文本文件的第一行
+        private OleDbConnection mConnection;
+        string sAccessConnection = "Provider=Microsoft.Jet.OLEDB.4.0;  Data Source=..\\..\\DataBase\\TestHistoryData.mdb";
+        public Import()
+        {
+            InitializeComponent();
+        }
+
+       
+        /// <summary>
+        /// 启动复制相应东西
+        /// </summary>
+        /// <param name="path"></param>
+        public void getBackup(string path)
+        {
+            try
+            {
+                //SetParameter sp = new SetParameter();
+                string[] files = Directory.GetFiles(path);
+                foreach (string s in files)
+                {
+                    //
+                    if (Path.GetExtension(s) == "*.txt" && File.Exists(s))
+                    {
+                        string currentTime = DateTime.Now.ToString("yyyy-MM-dd HH：mm：ss");
+                        string record = @"..\..\USB";
+                        Directory.CreateDirectory(record);
+                        File.Copy(s, record + @"\" + Path.GetFileName(s), true);
+                        if (!File.Exists(@"..\..\log\" + DateTime.Now.ToString("yyyy-MM-dd") + ".txt"))
+                        {
+                            StreamWriter sw = new StreamWriter(@"..\..\log\" + DateTime.Now.ToString("yyyy-MM-dd") + ".txt", true);
+                            sw.WriteLine("复制文件：{0}", Path.GetFileName(s));
+                            sw.WriteLine("文件大小：{0}", s.Length.ToString());
+                            sw.WriteLine("路径：{0}", Path.GetDirectoryName(s));
+                            sw.WriteLine("复制时间：{0}", currentTime);
+                            sw.WriteLine("");
+                            sw.Close();
+                        }
+                        else
+                        {
+                            StreamWriter sw = new StreamWriter(@"..\..\log\" + DateTime.Now.ToString("yyyy-MM-dd") + ".txt", true);
+                            sw.WriteLine("复制文件：{0}", Path.GetFileName(s));
+                            sw.WriteLine("文件大小：{0}", s.Length.ToString());
+                            sw.WriteLine("路径：{0}", Path.GetDirectoryName(s));
+                            sw.WriteLine("复制时间：{0}", currentTime);
+                            sw.WriteLine("");
+                            sw.Close();
+                        }
+                    }
+                }
+            }
+            catch (ArgumentException err)
+            {
+                MessageBox.Show(err.Message, "出现异常！", MessageBoxButtons.OKCancel, MessageBoxIcon.Error);
+            }
+            catch (PathTooLongException err)
+            {
+                MessageBox.Show(err.Message, "出现异常！", MessageBoxButtons.OKCancel, MessageBoxIcon.Error);
+            }
+            catch (IOException err)
+            {
+                MessageBox.Show(err.Message, "出现异常！", MessageBoxButtons.OKCancel, MessageBoxIcon.Error);
+            }
+            catch (UnauthorizedAccessException err)
+            {
+                MessageBox.Show(err.Message, "出现异常！", MessageBoxButtons.OKCancel, MessageBoxIcon.Error);
+            }
+        }
+
+        private void timerInfo_Tick(object sender, EventArgs e)
+        {
+            if (timerInfo.Enabled == true)
+            {
+                DriveInfo[] drvs = DriveInfo.GetDrives();
+                foreach (DriveInfo drv in drvs)
+                {
+                    if (drv.DriveType == DriveType.Removable && drv.IsReady == true)
+                    {
+                        getBackup(drv.Name);
+
+                        string[] dirs = Directory.GetDirectories(drv.Name);
+                        foreach (string s1 in dirs)
+                        {
+                            string[] subDirs = Directory.GetDirectories(s1);
+                            if (subDirs.Length == 0)
+                            {
+                                getBackup(s1);
+                            }
+                            else
+                            {
+                                foreach (string s2 in subDirs)
+                                {
+                                    getBackup(s2);
+                                }
+                            }
+                        }
+                    }
+                }
+                timerInfo.Enabled = false;
+                MessageBox.Show("导入成功！", "提示", MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
+            }
+        }
+
+  
+
+        private void buttonLoadSQL_Click(object sender, EventArgs e)
+        {
+            //string InitialDireectory = string.Format(@"{0}\..\..\", AppDomain.CurrentDomain.SetupInformation.ApplicationBase);Application.StartupPath +
+            openFileDialogtxt.InitialDirectory = @"../../USB";
+            openFileDialogtxt.Filter = "文件|*.*";
+            openFileDialogtxt.FilterIndex = 2;
+            openFileDialogtxt.RestoreDirectory = false;
+            //openFileDialog1.ShowHelp = true;// 对话框 发生变化
+            openFileDialogtxt.Title = "打开文件";
+            openFileDialogtxt.FileName = "";
+            openFileDialogtxt.Multiselect = true;
+  
+            if (openFileDialogtxt.ShowDialog() == DialogResult.OK)
+            {
+                string filePath = openFileDialogtxt.FileName.ToString();
+
+                StreamReader objReader = new StreamReader(filePath,System.Text.Encoding.GetEncoding("GB2312"));
+
+                char[] parsChar = { ',' };
+
+                string sLine = "";
+                firstLine = objReader.ReadLine();
+                //MessageBox.Show(firstLine);
+                while (sLine != null)
+                {
+                    sLine = objReader.ReadLine();
+                    if (sLine != null && !sLine.Equals(""))
+                    {
+                       
+                        string mTreeView = Main.MTreeName.ToString();
+                        string HTestHisData = sLine.Split(parsChar)[0].ToString();
+                            string Htest_type = "";
+                            switch (sLine.Split(parsChar)[1].ToString())
+                            {
+                                case "M":
+                                    {
+                                        Htest_type = "手动泡点测试";
+                                    }
+                                    break;
+                                case "B":
+                                    {
+                                        Htest_type = "基本泡点测试";
+                                    }
+                                    break;
+                                case "A":
+                                    {
+                                        Htest_type = "增强泡点测试";
+                                    }
+                                    break;
+                                case "P":
+                                    {
+                                        Htest_type = "保压测试";
+                                    }
+                                    break;
+                                case "D":
+                                    {
+                                        Htest_type = "扩散流测试";
+                                    }
+                                    break;
+                                case "d":
+                                    {
+                                        Htest_type = "超滤测试";
+                                    }
+                                    break;
+                                case "H":
+                                    {
+                                        Htest_type = "水浸入测试";
+                                    }
+                                    break;
+                                default: break;
+
+
+                            }
+
+                            string HTest_Psernum = sLine.Split(parsChar)[2].ToString();
+                            if (HTest_Psernum == null)
+                            {
+                                HTest_Psernum = "";
+                            }
+                            string THA_STime = sLine.Split(parsChar)[3].ToString();
+                            if (THA_STime == null)
+                            {
+                                THA_STime = "";
+                            }
+                            string HTest_Name = sLine.Split(parsChar)[4].ToString();
+                            if (HTest_Name == null)
+                            {
+                                HTest_Name = "";
+                            }
+                            string HTest_Fsernum = sLine.Split(parsChar)[5].ToString();
+                            if (HTest_Fsernum == null)
+                            {
+                                HTest_Fsernum = "";
+                            }
+                            string HTest_filt = sLine.Split(parsChar)[6].ToString();
+                            if (HTest_filt == null)
+                            {
+                                HTest_filt = "";
+                            }
+                            string HTest_LIQU = sLine.Split(parsChar)[7].ToString();
+                            if (HTest_LIQU == null)
+                            {
+                                HTest_LIQU = "";
+                            }
+                            string HTest_Filt_Hight = sLine.Split(parsChar)[8].ToString();
+                            if (HTest_Filt_Hight == null)
+                            {
+                                HTest_Filt_Hight = "";
+                            }
+                            string HTest_Filt_Num = sLine.Split(parsChar)[9].ToString();
+                            if (HTest_Filt_Num == null)
+                            {
+                                HTest_Filt_Num = "";
+                            }
+                            string HTest_Result = sLine.Split(parsChar)[10].ToString();
+                            if (HTest_Result == null)
+                            {
+                                HTest_Result = "";
+                            }
+                            string HTest_startp = sLine.Split(parsChar)[11].ToString();
+                            if (HTest_startp == null)
+                            {
+                                HTest_startp = "";
+                            }
+                            string HTest_SetBp = sLine.Split(parsChar)[12].ToString();
+                            if (HTest_SetBp == null)
+                            {
+                                HTest_SetBp = "";
+                            }
+                            string HTest_Up_Volm = sLine.Split(parsChar)[13].ToString();
+                            if (HTest_Up_Volm == null)
+                            {
+                                HTest_Up_Volm = "";
+                            }
+                            string THest_Dif_max = sLine.Split(parsChar)[14].ToString();
+                            if (THest_Dif_max == null)
+                            {
+                                THest_Dif_max = "";
+                            }
+                            string Htest_DifValue = sLine.Split(parsChar)[15].ToString();
+                            if (Htest_DifValue == null)
+                            {
+                                Htest_DifValue = "";
+                            }
+                            string Htest_Value = sLine.Split(parsChar)[16].ToString();
+                            if (Htest_Value == null)
+                            {
+                                Htest_Value = "";
+                            }
+                            string HTest_Filter_Area = sLine.Split(parsChar)[17].ToString();
+                            if (HTest_Filter_Area == null)
+                            {
+                                HTest_Filter_Area = "";
+                            }
+                            string HTest_Meme_Aper = sLine.Split(parsChar)[18].ToString();
+                            if (HTest_Meme_Aper == null)
+                            {
+                                HTest_Meme_Aper = "";
+                            }
+                            string HTest_Filter_type = sLine.Split(parsChar)[19].ToString();
+                            if (HTest_Filter_type == null)
+                            {
+                                HTest_Filter_type = "";
+                            }
+                            string Htest_DiffePress = sLine.Split(parsChar)[20].ToString();
+                            if (Htest_DiffePress == null)
+                            {
+                                Htest_DiffePress = "";
+                            }
+                            string HTest_CDifValue = sLine.Split(parsChar)[21].ToString();
+                            if (HTest_CDifValue == null)
+                            {
+                                HTest_CDifValue = "";
+                            }
+                            string Htest_testimes = sLine.Split(parsChar)[22].ToString();
+                            if (Htest_testimes == null)
+                            {
+                                Htest_testimes = "";
+                            }
+                            string HTest_Sampling_Frequency = sLine.Split(parsChar)[23].ToString();
+                            if (HTest_Sampling_Frequency == null)
+                            {
+                                HTest_Sampling_Frequency = "";
+                            }
+                            string HTest_DifStart = sLine.Split(parsChar)[24].ToString();
+                            if (HTest_DifStart == null)
+                            {
+                                HTest_DifStart = "";
+                            }
+                            string HtestName = sLine.Split(parsChar)[25].ToString();
+                            if (HtestName == null)
+                            {
+                                HtestName = "";
+                            }
+                            string Htest_Press_Line ="";
+                            for (int i = 26; i < 90; i++)
+                            {
+                                Htest_Press_Line =Htest_Press_Line+ sLine.Split(parsChar)[i].ToString() + ',';
+                            }
+                            Htest_Press_Line = Htest_Press_Line.Substring(0, Htest_Press_Line.Length - 2);
+
+                            string Htest_Dif_Line = "";
+                            for (int i = 91; i < 155; i++)
+                            {
+                                Htest_Dif_Line = Htest_Dif_Line+sLine.Split(parsChar)[i].ToString() + ',';
+                            }
+                            Htest_Dif_Line = Htest_Dif_Line.Substring(0, Htest_Dif_Line.Length - 2);
+
+
+                            string mQuery = String.Format("INSERT INTO {0}([TestHisData],[Htest_type],[Test_Psernum],[HA_STime],[Test_Name],[Test_Fsernum],[Test_filt],[Test_LIQU],[Test_Filt_Hight],[Test_Filt_Num],[Test_Result],[Test_startp],[Test_SetBp],[Test_Up_Volm],[Test_Dif_max],[Htest_DifValue],[Htest_Value],[Test_Filter_Area],[Test_Meme_Aper],[Test_Filter_type],[Htest_DiffePress],[Test_CDifValue],[Test_testimes],[Test_Sampling_Frequency],[Htest_DifStart],[Htest_Name],[Htest_Press_Line],[Htest_Dif_Line]) VALUES ('" + HTestHisData.ToString() + "','" + Htest_type.ToString() + "','" + HTest_Psernum.ToString() + "','" + THA_STime.ToString() + "','"+HTest_Name.ToString()+"','" + HTest_Fsernum.ToString() + "','" + HTest_filt.ToString() + "','" + HTest_LIQU.ToString() + "','" + HTest_Filt_Hight.ToString() + "','" + HTest_Filt_Num.ToString() + "','" + HTest_Result.ToString() + "','" + HTest_startp.ToString() + "','" + HTest_SetBp.ToString() + "', '" + HTest_Up_Volm.ToString() + "','" + THest_Dif_max.ToString() + "','" + Htest_DifValue.ToString() + "','" + Htest_Value.ToString() + "','" + HTest_Filter_Area.ToString() + "','" + HTest_Meme_Aper.ToString() + "','" + HTest_Filter_type.ToString() + "','" + Htest_DiffePress.ToString() + "','" + HTest_CDifValue.ToString() + "','" + Htest_testimes.ToString() + "','" + HTest_Sampling_Frequency.ToString() + "','" + HTest_DifStart.ToString() + "','" + HtestName.ToString() + "','" + Htest_Press_Line.ToString() + "','" + Htest_Dif_Line.ToString() + "')", mTreeView);
+                            mConnection = new OleDbConnection(sAccessConnection);
+                            mConnection.Open();
+                            OleDbCommand da = new OleDbCommand(mQuery, mConnection);
+
+                            try
+                            {
+                                da.CommandType = CommandType.Text;
+                                if (mConnection.State != ConnectionState.Open) { mConnection.Open(); }
+                                da.ExecuteNonQuery();
+                                this.Close();
+
+                            }
+
+                            catch (Exception ex)
+                            {
+
+                                LogClass.WriteLogFile ("Exception:" + ex.ToString());
+
+                            }
+
+                            finally
+                            {
+                                mflag = 0;
+                                mConnection.Close();
+
+                            }
+                        }
+                    }
+                
+                MessageBox.Show("执行导入完毕！", "提示");
+                objReader.Close();
+               
+                this.Close();
+            }
+                
+                
+            }
+        }
+
+
+    }
+
+
